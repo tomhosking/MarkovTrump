@@ -1,0 +1,6 @@
+[package]
+name = "generator"
+version = "0.1.0"
+authors = ["tomhosking <tomhosking@gmail.com>"]
+
+[dependencies]
