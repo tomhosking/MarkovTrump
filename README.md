@@ -11,9 +11,9 @@ To fetch the Donalds latest ramblings and generate some more:
 
 ## ToDo
 
- [ ] Clean tweets
- [ ] Start from sentence end?
- [ ] Deal with punctuation properly
- [ ] Call generator from python
- [ ] Perform full round trip on demand with any handle
- [ ] Dockerise!
+ - [ ] Clean tweets
+ - [ ] Start from sentence end?
+ - [ ] Deal with punctuation properly
+ - [ ] Call generator from python
+ - [ ] Perform full round trip on demand with any handle
+ - [ ] Dockerise!
