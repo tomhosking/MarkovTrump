@@ -14,7 +14,7 @@ type TweetData = Vec<String>;
 
 
 fn main() {
-    let mut file = File::open("tweets.json").expect("Couldnt open file");
+    let mut file = File::open("tweets_all.json").expect("Couldnt open file");
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
     let parsed : Vec<HashMap<String, String>> = serde_json::from_str(&data).unwrap();
@@ -49,7 +49,7 @@ fn learn(probs: &mut TransferMatrix, tweets: &TweetData) {
         for s in clean_tweet.split("__SPLIT")
         {
             if s != "" {
-                let s = format!("{} {} {}","__START1", s, "__END");
+                let s = format!("{} {} {}","__START1 __START2 __START3", s, "__END");
                 sentences.push(s.into());
             }
         }
@@ -58,19 +58,21 @@ fn learn(probs: &mut TransferMatrix, tweets: &TweetData) {
 
     // println!("{:?}", sentences);
     for s in sentences {
-        // let mut prev_word1 : String = String::from("");
+        let mut prev_word1 : String = String::from("");
         let mut prev_word2 : String = String::from("");
+        let mut prev_word3 : String = String::from("");
         for (i,w) in s.split(" ").enumerate()
         {
             if !w.trim().eq("") {
-                if i>0{
-                    let key : Key = prev_word2.clone();
-                    let item : (Key, String) = (prev_word2.into(),w.trim().into());
+                if i>2{
+                    let key : Key = format!("{} {} {}", prev_word1.clone(), prev_word2.clone(), prev_word3.clone());
+                    let item : (Key, String) = (key.clone(),w.trim().into());
                     *trans_count.entry(item).or_insert(0) += 1; // update transfer count
                     *result_count.entry(key).or_insert(0) += 1; //update normalisation
                 }
-                // prev_word1 = prev_word2.clone();
-                prev_word2 = w.trim().into();
+                prev_word1 = prev_word2.clone();
+                prev_word2 = prev_word3.clone();
+                prev_word3 = w.trim().into();
             }
         }
     }
@@ -88,7 +90,8 @@ fn generate(probs: &TransferMatrix) -> String {
     let mut tweet =  String::new();
     let mut words : Vec<String> = Vec::new();
     words.push(String::from("__START1"));
-    // words.push(String::from("__START2"));
+    words.push(String::from("__START2"));
+    words.push(String::from("__START3"));
     let mut sentence_done = false;
     while !sentence_done {
         // let val : f32;
@@ -102,8 +105,8 @@ fn generate(probs: &TransferMatrix) -> String {
                None => break,
             };
             let w = &item.1;
-
-            if item.0.eq(words.last().unwrap()) {
+            let key : Key = format!("{} {} {}", words[words.len()-3], words[words.len()-2], words.last().unwrap());
+            if item.0.eq(&key) {
                 // println!("{:?}=={:?}? -> {} p={} sum={} tgt={}", words.last().unwrap(), item.0, w, p, prob_sum, rand_tgt);
                 if prob_sum + p > rand_tgt {
                     word_done = true;
@@ -124,6 +127,8 @@ fn generate(probs: &TransferMatrix) -> String {
             }
             else {
                 words.push(String::from("__START1"));
+                words.push(String::from("__START2"));
+                words.push(String::from("__START3"));
             }
             // sentence_done = true;
         }
@@ -131,6 +136,6 @@ fn generate(probs: &TransferMatrix) -> String {
     }
     // println!("{:?}", words);
 
-    tweet.push_str(words.join(" ").replace("__START1 ","").replace("__END","").trim());
+    tweet.push_str(words.join(" ").replace(" __START3","").replace(" __START2","").replace("__START1 ","").replace(" __END","").trim());
     return tweet;
 }
