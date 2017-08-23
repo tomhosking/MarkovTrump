@@ -48,7 +48,7 @@ fn learn(probs: &mut TransferMatrix, tweets: &TweetData) {
 
         for s in clean_tweet.split("__SPLIT")
         {
-            if s != " " {
+            if s != "" {
                 let s = format!("{} {} {}","__START1", s, "__END");
                 sentences.push(s.into());
             }
@@ -62,14 +62,16 @@ fn learn(probs: &mut TransferMatrix, tweets: &TweetData) {
         let mut prev_word2 : String = String::from("");
         for (i,w) in s.split(" ").enumerate()
         {
-            if i>0{
-                let key : Key = prev_word2.clone();
-                let item : (Key, String) = (prev_word2.into(),w.into());
-                *trans_count.entry(item).or_insert(0) += 1; // update transfer count
-                *result_count.entry(key).or_insert(0) += 1; //update normalisation
+            if !w.trim().eq("") {
+                if i>0{
+                    let key : Key = prev_word2.clone();
+                    let item : (Key, String) = (prev_word2.into(),w.trim().into());
+                    *trans_count.entry(item).or_insert(0) += 1; // update transfer count
+                    *result_count.entry(key).or_insert(0) += 1; //update normalisation
+                }
+                // prev_word1 = prev_word2.clone();
+                prev_word2 = w.trim().into();
             }
-            // prev_word1 = prev_word2.clone();
-            prev_word2 = w.into();
         }
     }
     for (key, count) in trans_count {
@@ -112,8 +114,20 @@ fn generate(probs: &TransferMatrix) -> String {
         }
 
         if words.last().unwrap().eq("__END") {
-            sentence_done = true;
+            let char_count = words
+                .iter()
+                .map(|name: &String | name.len())
+                .fold(0, |acc, len| acc + len );
+            // println!("{} -> {:?}", char_count, words);
+            if char_count > 140 {
+                sentence_done = true;
+            }
+            else {
+                words.push(String::from("__START1"));
+            }
+            // sentence_done = true;
         }
+
     }
     // println!("{:?}", words);
 
