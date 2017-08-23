@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::collections::HashMap;
 extern crate regex;
+extern crate rand;
 
 type Key = String;
 type TransferCount = HashMap< (Key, String) , i32>;
@@ -32,51 +33,90 @@ fn main() {
 
 fn learn(probs: &mut TransferMatrix, tweets: &TweetData) {
     let mut sentences : Vec<String> = Vec::new();
-    let mut transCount : TransferCount = TransferCount::new();
-    let mut resultCount : HashMap<String, i32> = HashMap::new();
+    let mut trans_count : TransferCount = TransferCount::new();
+    let mut result_count : HashMap<Key, i32> = HashMap::new();
     for tweet in tweets.iter() {
         // Clean
         lazy_static! {
-            static ref RE_NONALPHA : regex::Regex = regex::Regex::new(r"[^A-Za-z\s@#_\-,!?.]").unwrap();
+            static ref RE_NONALPHA : regex::Regex = regex::Regex::new(r"[^A-Za-z\s@#_\-,!?.0-9]").unwrap();
             static ref RE_URL : regex::Regex = regex::Regex::new(r"https?://[^\s]+").unwrap(); // This is very greedy!
             static ref RE_TERMINATORS : regex::Regex = regex::Regex::new(r"([^A-Z])([!.?]+)(\s|$)").unwrap();
         }
         let clean_tweet : String = RE_URL.replace_all(tweet, "").trim().into();
-        let clean_tweet : String = RE_TERMINATORS.replace_all(&clean_tweet, "$1$2 __END__SPLIT__START ").into();
+        let clean_tweet : String = RE_TERMINATORS.replace_all(&clean_tweet, "$1$2 __SPLIT").into();
         let clean_tweet : String = RE_NONALPHA.replace_all(&clean_tweet, "").replace("\n","").trim().into();
-        let clean_tweet = format!("{} {} {}","__START", clean_tweet, "__END");
+
         for s in clean_tweet.split("__SPLIT")
         {
-            if s != "__START __END" {
+            if s != " " {
+                let s = format!("{} {} {}","__START1", s, "__END");
                 sentences.push(s.into());
             }
         }
         // Tokenise
     }
-    for (i,s) in sentences.iter().enumerate() {
-        let mut prevWord : String = String::from("");
-        for w in s.split(" ")
+
+    // println!("{:?}", sentences);
+    for s in sentences {
+        // let mut prev_word1 : String = String::from("");
+        let mut prev_word2 : String = String::from("");
+        for (i,w) in s.split(" ").enumerate()
         {
-            if i > 0 {
-                let key : (Key, String) = (prevWord,w.into());
-                *transCount.entry(key).or_insert(0) += 1; // update transfer count
-                *resultCount.entry(w.into()).or_insert(0) += 1; //update normalisation
+            if i>0{
+                let key : Key = prev_word2.clone();
+                let item : (Key, String) = (prev_word2.into(),w.into());
+                *trans_count.entry(item).or_insert(0) += 1; // update transfer count
+                *result_count.entry(key).or_insert(0) += 1; //update normalisation
             }
-            prevWord = w.into();
+            // prev_word1 = prev_word2.clone();
+            prev_word2 = w.into();
         }
     }
-    for (key, count) in transCount {
-        let totalCount = resultCount.get(&key.1).unwrap();
-        // println!("{},{} -> {} of {}", key.0, key.1, count, totalCount);
-        probs.insert(key, (count as f32) / (*totalCount as f32));
+    for (key, count) in trans_count {
+        let total_count = result_count.get(&key.0).unwrap();
+        // println!("{},{} -> {} of {}", key.0, key.1, count, total_count);
+        probs.insert(key, (count as f32) / (*total_count as f32));
     }
-    for (key, p) in probs {
-        println!("{},{} -> {}", key.0, key.1, p);
-    }
+    // for (key, p) in probs {
+    //     println!("{:?},{} -> {}", key.0, key.1, p);
+    // }
 }
 
 fn generate(probs: &TransferMatrix) -> String {
     let mut tweet =  String::new();
-    tweet.push_str("This is an auto generated tweet. Sad!");
+    let mut words : Vec<String> = Vec::new();
+    words.push(String::from("__START1"));
+    // words.push(String::from("__START2"));
+    let mut sentence_done = false;
+    while !sentence_done {
+        // let val : f32;
+        let mut word_done = false;
+        let mut prob_sum = 0.0;
+        let rand::Open01(rand_tgt) = rand::random::<rand::Open01<f32>>();
+        let mut it = probs.iter();
+        while !word_done {
+            let (item, p) = match it.next() {
+               Some(x) => x,
+               None => break,
+            };
+            let w = &item.1;
+
+            if item.0.eq(words.last().unwrap()) {
+                // println!("{:?}=={:?}? -> {} p={} sum={} tgt={}", words.last().unwrap(), item.0, w, p, prob_sum, rand_tgt);
+                if prob_sum + p > rand_tgt {
+                    word_done = true;
+                    words.push(w.clone());
+                }
+                prob_sum += *p;
+            }
+        }
+
+        if words.last().unwrap().eq("__END") {
+            sentence_done = true;
+        }
+    }
+    // println!("{:?}", words);
+
+    tweet.push_str(words.join(" ").replace("__START1 ","").replace("__END","").trim());
     return tweet;
 }
